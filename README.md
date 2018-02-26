@@ -4,6 +4,18 @@
 
 ## Usage
 
+1. Config files in `/app` in the following format :
+
+ - `databaseconfig.py` : PySpark configuration
+ ```python
+#!/usr/bin/env python
+pyspark = {
+    'hdfs_path': '/path/to_json_file_or_directory',
+    'memory': '5g' # Allocated memory for Spark
+}
+```
+
+
 ## References
 
 * Tracking bitcoin users activity using community
