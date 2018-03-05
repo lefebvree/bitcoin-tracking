@@ -8,7 +8,7 @@ from pyspark.sql import SparkSession
 
 from os import path
 
-from app.network import TransactionNetwork
+from app.transactions import TransactionNetwork
 from app.databaseconfig import pyspark as cfg
 
 
