@@ -20,7 +20,7 @@ pyspark = {
 
 * Pyspark
 
-* Networkx
+* Neo4j
 
 
 ## References

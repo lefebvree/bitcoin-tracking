@@ -14,14 +14,6 @@ class Transaction:
         self.timestamp = timestamp
 
 
-class Address:
-    """
-
-    """
-    def __init__(self, hash):
-        self.hash = hash
-
-
 class TransactionInput:
     """
 

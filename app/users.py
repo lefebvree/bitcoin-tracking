@@ -1,66 +1,71 @@
 
 """
-Heuristics used to identify users
 """
 
-
-import networkx as nx
-
-from itertools import combinations
+from .graph_database_driver import GraphDatabaseDriver
 
 
 class UserNetwork:
+    """
 
+    """
     def __init__(self):
-        self.addresses = nx.Graph()
+        self.driver = GraphDatabaseDriver()
 
-    def __str__(self):
-        return ' '.join([str(len(self.addresses)), "addresses -",
-                         str(len(list(nx.connected_components(self.addresses)))), "users"])
+        self.heuristics_used = [0, 0, 0, 0]
 
-    def update_with_transaction(self, transaction):
+    def close(self):
+        self.driver.close()
+
+    def add_transaction(self, transaction):
         """
 
-        :param transaction:
         :return:
         """
+        clause = self.driver.create_transaction_clause()
+
+        for a in transaction.inputs + transaction.outputs:
+            clause.add_address(a.address)
+
         if len(transaction.inputs) > 1:
-            self.h1_inputs(transaction)
+            self.h1_inputs(transaction, clause)
 
         if len(transaction.outputs) == 2:
-            self.h2_change_address(transaction)
+            self.h2_change_address(transaction, clause)
 
-        # Add addresses not added with heuristics
-        for address in transaction.inputs + transaction.outputs:
-            self.addresses.add_node(address)
+        clause.execute()
 
-    def h1_inputs(self, transaction):
+    def h1_inputs(self, transaction, clause):
         """
         All addresses used as input of the same transaction belong to the
         same controlling entity, called a User.
         """
         # For every combination of input addresses an edge is added to the graph
-        self.addresses.add_edges_from(combinations(transaction.inputs, 2))
+        for input_transaction in transaction.inputs[1:]:
+            clause.add_edge_between(transaction.inputs[0].address, input_transaction.address)
 
-    def h2_change_address(self, transaction):
+        self.heuristics_used[0] += 1
+
+    def h2_change_address(self, transaction, clause):
         """
         If there are exactly two output-addresses a1 and a2, that one of them
         (a1) appears for the first time and that the other (a2) has appeared before, then a1
         is considered to be the change address.
         """
-        a1_known_address = transaction.outputs[0] in self.addresses
-        a2_known_address = transaction.outputs[1] in self.addresses
+        a1_known_address = self.driver.address_exists(transaction.outputs[0].address)
+        a2_known_address = self.driver.address_exists(transaction.outputs[1].address)
 
         change_address = None
 
         # a1 is the change address
         if a2_known_address and not a1_known_address:
-            change_address = transaction.outputs[0]
+            change_address = transaction.outputs[0].address
         # a2 is the change address
         elif a1_known_address and not a2_known_address:
-            change_address = transaction.outputs[1]
+            change_address = transaction.outputs[1].address
 
         if change_address is not None:
-            for input_address in transaction.inputs:
-                self.addresses.add_edge(input_address, change_address)
+            for input_transaction in transaction.inputs:
+                clause.add_edge_between(input_transaction.address, change_address)
 
+            self.heuristics_used[1] += 1

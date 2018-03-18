@@ -1,4 +1,4 @@
 decorator==4.2.1
-networkx==2.1
+neo4j-driver==1.5.3
 py4j==0.10.4
 pyspark==2.2.1

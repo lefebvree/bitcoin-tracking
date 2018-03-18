@@ -3,8 +3,9 @@
 Structures for the Bitcoin transactions network and Bitcoin addresses
 """
 
+import sys
 
-from .bitcoin import Transaction, Address, TransactionInput, TransactionOutput
+from .bitcoin import Transaction, TransactionInput, TransactionOutput
 from .users import UserNetwork
 
 
@@ -14,19 +15,30 @@ class TransactionNetwork:
     (as inputs or outputs of all transactions)
     """
     def __init__(self):
-        self.transactions = []
-        self.user_network = UserNetwork()
+        self.addresses = UserNetwork()
 
     def build(self, spark_df):
         """ From a Spark dataframe following the json format build the transaction network
 
         :param spark_df: PySpark Dataframe object of bitcoin transactions
         """
-        spark_df.foreach(self.add_transaction_from_json)
 
-        print(self.user_network)
+        ite = spark_df.toLocalIterator()
 
-    def add_transaction_from_json(self, transaction_json):
+        transactions_count = 0
+        for t in ite:
+            self.addresses.add_transaction(TransactionNetwork.json_to_transaction(t))
+
+            transactions_count += 1
+            sys.stdout.write("\r{} transactions".format(transactions_count))
+            sys.stdout.flush()
+
+        # print(self.addresses)
+        self.addresses.close()
+        print(self.addresses.heuristics_used)
+
+    @staticmethod
+    def json_to_transaction(transaction_json):
         """ Create Transaction object from json representation
 
         :param transaction_json: JSON Object of a transaction
@@ -35,23 +47,11 @@ class TransactionNetwork:
         transaction_outputs = []
 
         for t_in in transaction_json.tx_ins:
-            address = Address(t_in.address)
-
-            transaction_in = TransactionInput(address, t_in.value)
+            transaction_in = TransactionInput(t_in.address, t_in.value)
             transaction_inputs.append(transaction_in)
 
         for t_out in transaction_json.tx_outs:
-            address = Address(t_out.address)
-
-            transaction_out = TransactionOutput(address, t_out.value)
+            transaction_out = TransactionOutput(t_out.address, t_out.value)
             transaction_outputs.append(transaction_out)
 
-        transaction = Transaction(transaction_inputs, transaction_outputs, transaction_json.timestamp)
-        self.transactions.append(transaction)
-
-        self.user_network.update_with_transaction(transaction)
-
-
-        print(self.user_network)
-
-
+        return Transaction(transaction_inputs, transaction_outputs, transaction_json.timestamp)

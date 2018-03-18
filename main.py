@@ -20,6 +20,8 @@ def main():
         .config("spark.executor.memory", cfg['memory']) \
         .getOrCreate()
 
+    spark.sparkContext.setLogLevel("WARN")
+
     transactions_dataframe = spark.read.json(path.join("hdfs://", cfg['hdfs_path']))
 
     transactions_network = TransactionNetwork()
