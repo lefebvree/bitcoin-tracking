@@ -1,31 +1,33 @@
 
 """
+Methods and heuristics used to build the bitcoin user network graph from transactions list
 """
 
 from .graph_database_driver import GraphDatabaseDriver
 
 
 class UserNetwork:
-    """
+    """ Process transactions and populate the GraphDatabaseDriver with addresses and their relations
 
     """
     def __init__(self):
         self.driver = GraphDatabaseDriver()
-
+        # Keep track of each heuristic usage
         self.heuristics_used = [0, 0, 0, 0]
 
     def close(self):
         self.driver.close()
 
     def add_transaction(self, transaction):
-        """
+        """ Process a bitcoin transaction and addresses and relations to the graph database
 
-        :return:
         """
         clause = self.driver.create_transaction_clause()
 
         for a in transaction.inputs + transaction.outputs:
             clause.add_address(a.address)
+
+        # Applies heuristics
 
         if len(transaction.inputs) > 1:
             self.h1_inputs(transaction, clause)
@@ -36,8 +38,7 @@ class UserNetwork:
         clause.execute()
 
     def h1_inputs(self, transaction, clause):
-        """
-        All addresses used as input of the same transaction belong to the
+        """ All addresses used as input of the same transaction belong to the
         same controlling entity, called a User.
         """
         # For every combination of input addresses an edge is added to the graph
@@ -47,8 +48,7 @@ class UserNetwork:
         self.heuristics_used[0] += 1
 
     def h2_change_address(self, transaction, clause):
-        """
-        If there are exactly two output-addresses a1 and a2, that one of them
+        """ If there are exactly two output-addresses a1 and a2, that one of them
         (a1) appears for the first time and that the other (a2) has appeared before, then a1
         is considered to be the change address.
         """

@@ -6,21 +6,33 @@
 
 1. Config files in `/app` in the following format :
 
- - `databaseconfig.py` : PySpark configuration
+ - `databaseconfig.py` : PySpark and Neo4j databases configurations
  ```python
 #!/usr/bin/env python
 pyspark = {
     'hdfs_path': '/path/to_json_file_or_directory',
-    'memory': '5g' # Allocated memory for Spark
+    'memory': '2g' # Allocated memory for Spark
 }
+neo4j = {
+    'uri': 'bolt://localhost:7687',
+    'user': 'neo4j',
+    'password': 'password'
+}
+```
+
+2. Running `main.py` will populate the Neo4j Graph Database with the discovered user
+network :
+
+```shell
+python3 main.py
 ```
 
 
 ## Libraries
 
-* Pyspark
+* Pyspark : https://spark.apache.org/docs/0.9.0/python-programming-guide.html
 
-* Neo4j
+* Neo4j : https://neo4j.com/
 
 
 ## References

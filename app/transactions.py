@@ -1,6 +1,6 @@
 
 """
-Structures for the Bitcoin transactions network and Bitcoin addresses
+Structures for the Bitcoin transactions network and Bitcoin users graph
 """
 
 import sys
@@ -23,17 +23,19 @@ class TransactionNetwork:
         :param spark_df: PySpark Dataframe object of bitcoin transactions
         """
 
+        # Will iterate over each row of the pyspark dataframe
         ite = spark_df.toLocalIterator()
 
         transactions_count = 0
         for t in ite:
+            # Each transaction is converted to a Transaction object and proccessed by the UserNetwork
             self.addresses.add_transaction(TransactionNetwork.json_to_transaction(t))
 
+            # Display transactions count
             transactions_count += 1
             sys.stdout.write("\r{} transactions".format(transactions_count))
             sys.stdout.flush()
 
-        # print(self.addresses)
         self.addresses.close()
         print(self.addresses.heuristics_used)
 
