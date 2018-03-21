@@ -101,13 +101,20 @@ class Neo4jTransactionClause(Neo4jClause):
         self.statements.append("MERGE (a{0}:Address {{ hash: ${0} }}) ".format(address_parameter))
         self.parameters[address_parameter] = address_hash
 
-    def add_edge_between(self, address1, address2):
+    def add_edge_between(self, address1, address2, optional_property=None):
         """ Add a USER relation to the graph database between two known addresses
 
         :param address1: key of bitcoin address
         :param address2: key of bitcoin address
+        :param optional_property: string to add as relation attribute
         """
+        if address1 == address2:
+            return
+
         a1 = self.addresses[address1]
         a2 = self.addresses[address2]
 
-        self.statements.append("MERGE (a{0})-[:USER]->(a{1}) ".format(a1, a2))
+        if optional_property is None:
+            self.statements.append("MERGE (a{0})-[:USER]->(a{1}) ".format(a1, a2))
+        else:
+            self.statements.append("MERGE (a{0})-[:USER {{ {2} }}]->(a{1}) ".format(a1, a2, optional_property))

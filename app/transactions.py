@@ -26,14 +26,21 @@ class TransactionNetwork:
         # Will iterate over each row of the pyspark dataframe
         ite = spark_df.toLocalIterator()
 
+        print("Transactions :     Addresses :      Heuristics usage :")
+
         transactions_count = 0
         for t in ite:
-            # Each transaction is converted to a Transaction object and proccessed by the UserNetwork
+            # Each transaction is converted to a Transaction object and processed by the UserNetwork
             self.addresses.add_transaction(TransactionNetwork.json_to_transaction(t))
 
-            # Display transactions count
+            # Display transactions count and heuristics usage
             transactions_count += 1
-            sys.stdout.write("\r{} transactions".format(transactions_count))
+            sys.stdout.write(
+                "\r{0: >12}      {1: >12}        {2}".format(
+                    transactions_count,
+                    len(self.addresses.known_addresses),
+                    self.addresses.heuristics_used
+                ))
             sys.stdout.flush()
 
         self.addresses.close()
