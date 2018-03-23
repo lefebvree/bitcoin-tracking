@@ -9,7 +9,7 @@ a public key representing a bitcoin address and a bitcoin amount
 
 class Transaction:
     """ Single bitcoin transaction recording an exchange from a
-    list of inputs to a list of outputs
+        list of inputs to a list of outputs
 
     :param inputs: List of TransactionInput
     :param outputs: List of TransactionOutput

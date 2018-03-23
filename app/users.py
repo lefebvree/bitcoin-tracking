@@ -13,7 +13,7 @@ class UserNetwork:
     def __init__(self):
         self.driver = GraphDatabaseDriver()
 
-        self.heuristics_enabled = [self.h1_inputs, self.h2_change_address, self.h3_one_time_change_address]
+        self.heuristics_enabled = [self.h1_inputs]
         # Keep track of each heuristic usage
         self.heuristics_used = [0, 0, 0, 0]
 
@@ -23,38 +23,40 @@ class UserNetwork:
     def close(self):
         self.driver.close()
 
+    def commit_new_entries(self):
+        self.driver.commit_additions()
+
     def add_transaction(self, transaction):
         """ Process a bitcoin transaction and addresses and relations to the graph database
 
         """
-        clause = self.driver.create_transaction_clause()
-
         for a in transaction.inputs + transaction.outputs:
-            self.known_addresses.add(a.address)
-            clause.add_address(a.address)
+            if a.address not in self.known_addresses:
+                self.known_addresses.add(a.address)
+                self.driver.add_address(a.address)
 
         # Applies enabled heuristics
         for heuristic in self.heuristics_enabled:
-            heuristic(transaction, clause)
+            heuristic(transaction)
 
-        clause.execute()
+        # clause.execute()
 
-    def h1_inputs(self, transaction, clause):
+    def h1_inputs(self, transaction):
         """ All addresses used as input of the same transaction belong to the
-        same controlling entity, called a User.
+            same controlling entity, called a User.
         """
         # If more than 1 input address
         if len(transaction.inputs) > 1:
             # An edge is added between the first input address and all the others
             for input_transaction in transaction.inputs[1:]:
-                clause.add_edge_between(transaction.inputs[0].address, input_transaction.address)
+                self.driver.add_relation([transaction.inputs[0].address, input_transaction.address])
 
             self.heuristics_used[0] += 1
 
-    def h2_change_address(self, transaction, clause):
+    def h2_change_address(self, transaction):
         """ If there are exactly two output-addresses a1 and a2, that one of them
-        (a1) appears for the first time and that the other (a2) has appeared before, then a1
-        is considered to be the change address.
+            (a1) appears for the first time and that the other (a2) has appeared before, then a1
+            is considered to be the change address.
         """
         # 2 output addresses exactly
         if len(transaction.outputs) == 2:
@@ -74,15 +76,15 @@ class UserNetwork:
 
             if change_address is not None:
                 for input_transaction in transaction.inputs:
-                    clause.add_edge_between(input_transaction.address, change_address, "change")
+                    self.driver.add_relation([input_transaction.address, change_address])
 
                 self.heuristics_used[1] += 1
 
-    def h3_one_time_change_address(self, transaction, clause):
+    def h3_one_time_change_address(self, transaction):
         """ An address is considered a one-time change address if it satisfies the following properties:
-        - The transaction is not a coin generation
-        - The address is not among the input addresses (address reuse)
-        - It is the only output address appearing for the first time
+            - The transaction is not a coin generation
+            - The address is not among the input addresses (address reuse)
+            - It is the only output address appearing for the first time
         """
         # Coinbase transaction (coin generation) have address hash "0" as input
         if transaction.inputs[0].address != "0":
@@ -106,7 +108,7 @@ class UserNetwork:
 
             if one_time_change_address is not None:
                 for input_transaction in transaction.inputs:
-                    clause.add_edge_between(input_transaction.address, one_time_change_address, "one_time_change")
+                    self.driver.add_relation([input_transaction.address, one_time_change_address])
 
                 self.heuristics_used[2] += 1
 

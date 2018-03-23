@@ -16,26 +16,17 @@ class GraphDatabaseDriver:
     def __init__(self):
         self._driver = GraphDatabase.driver(cfg['uri'], auth=(cfg['user'], cfg['password']))
 
+        # Create an Index on Address:hash, fasten MERGE operations by a lot
+        with self._driver.session() as session:
+            with session.begin_transaction() as tx:
+                tx.run("CREATE INDEX ON :Address(hash)")
+
+        # New addresses and transactions stored in memory before batch adding
+        self.batch_new_addresses = []
+        self.batch_new_relations = []
+
     def close(self):
         self._driver.close()
-
-    def create_transaction_clause(self):
-        """ Create and return a TransactionClause which will be executed with this driver
-
-        """
-        return Neo4jTransactionClause(self)
-
-    def run_clause(self, c):
-        """ Create a session and run clause statements applying clause parameters
-
-        :param c: Neo4jClause to run
-        """
-        with self._driver.session() as session:
-            session.write_transaction(self._write_clause_transaction, c)
-
-    @staticmethod
-    def _write_clause_transaction(tx, clause):
-        tx.run(clause.get_statement(), clause.parameters)
 
     def address_exists(self, address_hash):
         """ Check if a Bitcoin address is present in Graph database
@@ -54,67 +45,46 @@ class GraphDatabaseDriver:
         result = result.single()
         return result is not None and result[0] is not None
 
-
-class Neo4jClause:
-    """ Statements and arguments o be executed with GraphDatabaseDriver driver
-
-    :param database_driver: Neo4j GraphDatabaseDriver
-    """
-    def __init__(self, database_driver):
-        self.statements = []
-        self.parameters = {}
-        self._driver = database_driver
-
-    def get_statement(self):
-        """ Join each clause statements as a single String
+    def commit_additions(self):
+        """ Add new addresses and new relations then clear current batch
 
         """
-        return " ".join(self.statements)
+        self._add_addresses()
+        self.batch_new_addresses.clear()
 
-    def execute(self):
-        """ Run clause statements applying parameters
+        self._add_relations()
+        self.batch_new_relations.clear()
+
+    def add_address(self, address):
+        """ Add a new address for next commit
+
+        :param address: String new address key
+        """
+        self.batch_new_addresses.append(address)
+
+    def add_relation(self, relation):
+        """ Add a new USER relation between two addresses for next commit
+
+        :param relation: List of two address key
+        """
+        self.batch_new_relations.append(relation)
+
+    def _add_addresses(self):
+        """ Create nodes for all addresses in batch_new_addresses
 
         """
-        self._driver.run_clause(self)
+        query = "UNWIND $addresses AS h MERGE (a:Address{ hash: h })"
+        with self._driver.session() as session:
+            with session.begin_transaction() as tx:
+                tx.run(query, addresses=self.batch_new_addresses)
 
-
-class Neo4jTransactionClause(Neo4jClause):
-    """ Clause adding bitcoin known addresses and relations to Neo4j graph
-
-    """
-    def __init__(self, database_driver):
-        super().__init__(database_driver)
-        # Dictionary of clause's addresses with their statement node alias
-        self.addresses = {}
-        self.alias_index = 0
-
-    def add_address(self, address_hash):
-        """ New Bitcoin address to add to the graph database
-
-        :param address_hash: key of bitcoin address
+    def _add_relations(self):
+        """ Create edges for all addresses relations in batch_new_relations
         """
-        # Address are assigned an alias in the format a0, a1, a2... in the clause statements
-        address_parameter = "a{}".format(self.alias_index)
-        self.addresses[address_hash] = address_parameter
-        self.alias_index += 1
-
-        self.statements.append("MERGE (a{0}:Address {{ hash: ${0} }}) ".format(address_parameter))
-        self.parameters[address_parameter] = address_hash
-
-    def add_edge_between(self, address1, address2, optional_property=None):
-        """ Add a USER relation to the graph database between two known addresses
-
-        :param address1: key of bitcoin address
-        :param address2: key of bitcoin address
-        :param optional_property: string to add as relation attribute
-        """
-        if address1 == address2:
-            return
-
-        a1 = self.addresses[address1]
-        a2 = self.addresses[address2]
-
-        if optional_property is None:
-            self.statements.append("MERGE (a{0})-[:USER]->(a{1}) ".format(a1, a2))
-        else:
-            self.statements.append("MERGE (a{0})-[:USER {{ {2} }}]->(a{1}) ".format(a1, a2, optional_property))
+        query = "UNWIND $relations AS a " \
+                "MATCH (a1:Address { hash: a[0] }) " \
+                "MATCH (a2:Address { hash: a[1] }) " \
+                "MERGE (a1)-[:USER]->(a2)"
+        with self._driver.session() as session:
+            with session.begin_transaction() as tx:
+                tx.run(query, relations=self.batch_new_relations)

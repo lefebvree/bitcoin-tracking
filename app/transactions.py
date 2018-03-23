@@ -10,9 +10,8 @@ from .users import UserNetwork
 
 
 class TransactionNetwork:
-    """
-    List of transactions with an unique set of all encountered addresses
-    (as inputs or outputs of all transactions)
+    """ List of transactions with an unique set of all encountered addresses
+        (as inputs or outputs of all transactions)
     """
     def __init__(self):
         self.addresses = UserNetwork()
@@ -24,27 +23,42 @@ class TransactionNetwork:
         """
 
         # Will iterate over each row of the pyspark dataframe
-        ite = spark_df.toLocalIterator()
+        transactions_total = spark_df.count()
+        print(transactions_total, "total transactions")
 
-        print("Transactions :     Addresses :      Heuristics usage :")
+        transactions_iterator = spark_df.toLocalIterator()
 
-        transactions_count = 0
-        for t in ite:
+        transactions_total_count = 0
+        # Transactions are committed every 10000
+        transactions_batch_limit = 10000
+        transactions_batch_count = 0
+
+        print("Transactions :     Addresses :    Heuristics usage :")
+
+        for t in transactions_iterator:
+
             # Each transaction is converted to a Transaction object and processed by the UserNetwork
             self.addresses.add_transaction(TransactionNetwork.json_to_transaction(t))
 
             # Display transactions count and heuristics usage
-            transactions_count += 1
+            transactions_total_count += 1
             sys.stdout.write(
-                "\r{0: >12}      {1: >12}        {2}".format(
-                    transactions_count,
+                "\r{0: >12}    {1: >12}      {2}      ({3}%)".format(
+                    transactions_total_count,
                     len(self.addresses.known_addresses),
-                    self.addresses.heuristics_used
+                    self.addresses.heuristics_used,
+                    round(transactions_total_count/transactions_total*100, 2)
                 ))
             sys.stdout.flush()
 
+            # Commit new transactions every transactions_batch_limit
+            transactions_batch_count += 1
+            if transactions_batch_count == transactions_batch_limit:
+                self.addresses.commit_new_entries()
+                transactions_batch_count = 0
+
+        print("\nDone")
         self.addresses.close()
-        print(self.addresses.heuristics_used)
 
     @staticmethod
     def json_to_transaction(transaction_json):
