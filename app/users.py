@@ -13,7 +13,7 @@ class UserNetwork:
     def __init__(self):
         self.driver = GraphDatabaseDriver()
 
-        self.heuristics_enabled = [self.h1_inputs]
+        self.heuristics_enabled = [self.h1_inputs, self.h2_change_address, self.h3_one_time_change_address]
         # Keep track of each heuristic usage
         self.heuristics_used = [0, 0, 0, 0]
 
@@ -30,16 +30,37 @@ class UserNetwork:
         """ Process a bitcoin transaction and addresses and relations to the graph database
 
         """
-        for a in transaction.inputs + transaction.outputs:
-            if a.address not in self.known_addresses:
-                self.known_addresses.add(a.address)
-                self.driver.add_address(a.address)
-
         # Applies enabled heuristics
         for heuristic in self.heuristics_enabled:
             heuristic(transaction)
 
-        # clause.execute()
+        for a in transaction.inputs + transaction.outputs:
+            if not self.is_known_address(a.address):
+                self.known_addresses.add(a.address)
+                self.driver.add_address(a.address)
+
+    def add_known_address(self, address):
+        """ Add an address to known addresses list after converting it to byte array
+
+        :param address: String of bitcoin address
+        """
+        b58_address = self.encode_address(address)
+        self.known_addresses.add(b58_address)
+
+    def is_known_address(self, address):
+        """ Check if address is in known addresses set
+
+        :param address: String of bitcoin address
+        """
+        return self.encode_address(address) in self.known_addresses
+
+    @staticmethod
+    def encode_address(address):
+        """ Convert address string to byte array
+
+        :param address: String of bitcoin address
+        """
+        return str.encode(address)
 
     def h1_inputs(self, transaction):
         """ All addresses used as input of the same transaction belong to the
@@ -60,10 +81,8 @@ class UserNetwork:
         """
         # 2 output addresses exactly
         if len(transaction.outputs) == 2:
-            # a1_known_address = self.driver.address_exists(transaction.outputs[0].address)
-            # a2_known_address = self.driver.address_exists(transaction.outputs[1].address)
-            a1_known_address = transaction.outputs[0].address in self.known_addresses
-            a2_known_address = transaction.outputs[1].address in self.known_addresses
+            a1_known_address = self.is_known_address(transaction.outputs[0].address)
+            a2_known_address = self.is_known_address(transaction.outputs[1].address)
 
             change_address = None
 
@@ -95,7 +114,7 @@ class UserNetwork:
             for output_address in transaction.outputs:
 
                 # Check if it is the only one to appear for the first time
-                if output_address.address not in self.known_addresses:
+                if not self.is_known_address(output_address.address):
                     if first_time_address:
                         # At least two new addresses as outputs
                         return

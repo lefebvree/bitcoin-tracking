@@ -28,23 +28,6 @@ class GraphDatabaseDriver:
     def close(self):
         self._driver.close()
 
-    def address_exists(self, address_hash):
-        """ Check if a Bitcoin address is present in Graph database
-
-        :param address_hash: address public key
-        """
-        with self._driver.session() as session:
-            return session.write_transaction(self._address_exists, address_hash)
-
-    @staticmethod
-    def _address_exists(tx, address_hash):
-        result = tx.run("MATCH (address:Address) "
-                        "WHERE address.hash = $hash "
-                        "RETURN address ", hash=address_hash)
-
-        result = result.single()
-        return result is not None and result[0] is not None
-
     def commit_additions(self):
         """ Add new addresses and new relations then clear current batch
 
@@ -62,12 +45,13 @@ class GraphDatabaseDriver:
         """
         self.batch_new_addresses.append(address)
 
-    def add_relation(self, relation):
+    def add_relation(self, edge):
         """ Add a new USER relation between two addresses for next commit
 
-        :param relation: List of two address key
+        :param edge: List of two address key
         """
-        self.batch_new_relations.append(relation)
+        if edge[0] != edge[1]:
+            self.batch_new_relations.append(edge)
 
     def _add_addresses(self):
         """ Create nodes for all addresses in batch_new_addresses
