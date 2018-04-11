@@ -14,16 +14,16 @@ from app.databaseconfig import pyspark as cfg
 
 def main():
 
+    print("Initialising PySpark executor...")
     spark = SparkSession.builder \
         .master("local") \
         .appName("Bitcoin Tracking") \
         .config("spark.executor.memory", cfg['memory']) \
         .getOrCreate()
 
-    spark.sparkContext.setLogLevel("WARN")
-
     transactions_dataframe = spark.read.json(path.join("hdfs://", cfg['hdfs_path']))
 
+    print("Initialising Neo4j session...")
     transactions_network = TransactionNetwork()
     transactions_network.build(transactions_dataframe)
 

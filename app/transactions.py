@@ -22,9 +22,11 @@ class TransactionNetwork:
         :param spark_df: PySpark Dataframe object of bitcoin transactions
         """
 
+        print("\nGetting already known addresses from Graph Database...")
+        self.addresses.populate_known_addresses()
+
         # Will iterate over each row of the pyspark dataframe
         transactions_total = spark_df.count()
-        print(transactions_total, "total transactions")
 
         transactions_iterator = spark_df.toLocalIterator()
 
@@ -33,7 +35,8 @@ class TransactionNetwork:
         transactions_batch_limit = 10000
         transactions_batch_count = 0
 
-        print("Transactions :     Addresses :    Heuristics usage :")
+        print("Building graph from", transactions_total, "transactions...")
+        print("Transactions :     Addresses :    Heuristics usage :    Progression :")
 
         for t in transactions_iterator:
 
@@ -43,7 +46,7 @@ class TransactionNetwork:
             # Display transactions count and heuristics usage
             transactions_total_count += 1
             sys.stdout.write(
-                "\r{0: >12}    {1: >12}      {2}      ({3}%)".format(
+                "\r{0: >12}    {1: >12}      {2}        ({3}%)".format(
                     transactions_total_count,
                     len(self.addresses.known_addresses),
                     self.addresses.heuristics_used,

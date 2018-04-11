@@ -23,6 +23,20 @@ class UserNetwork:
     def close(self):
         self.driver.close()
 
+    def populate_known_addresses(self):
+        """ Fetch addresses from graph database and add addresses to known addresses set
+
+        """
+        address_count = self.driver.get_address_count()
+
+        if address_count > 0:
+            print("Fetching", address_count, "addresses from database")
+            self.driver.fetch_all_known_addresses(self.add_known_address)
+            print(len(self.known_addresses), "uniques addresses added\n")
+
+        else:
+            print("No already known addresses in database")
+
     def commit_new_entries(self):
         self.driver.commit_additions()
 
@@ -36,7 +50,7 @@ class UserNetwork:
 
         for a in transaction.inputs + transaction.outputs:
             if not self.is_known_address(a.address):
-                self.known_addresses.add(a.address)
+                self.add_known_address(a.address)
                 self.driver.add_address(a.address)
 
     def add_known_address(self, address):
@@ -123,7 +137,7 @@ class UserNetwork:
 
                     # Check if not among inputs
                     if output_address.address not in map(lambda a: a.address, transaction.inputs):
-                        one_time_change_address = output_address
+                        one_time_change_address = output_address.address
 
             if one_time_change_address is not None:
                 for input_transaction in transaction.inputs:

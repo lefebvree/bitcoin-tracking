@@ -53,6 +53,30 @@ class GraphDatabaseDriver:
         if edge[0] != edge[1]:
             self.batch_new_relations.append(edge)
 
+    def get_address_count(self):
+        """ Get number of Addresses nodes in graph
+
+        """
+        query = "MATCH (:Address) RETURN count(*) AS address_count"
+        with self._driver.session() as session:
+            with session.begin_transaction() as tx:
+                result = tx.run(query).single()
+                return result['address_count']
+
+    def fetch_all_known_addresses(self, callback):
+        """ Fetch all addresses from graph and execute callback function for everyone
+
+        :param callback: Function to execute with each address
+        """
+        query = "MATCH p=(a:Address) " \
+                "RETURN a.hash AS address "
+
+        with self._driver.session() as session:
+            with session.begin_transaction() as tx:
+                for record in tx.run(query):
+                    # Add addresses to set
+                    callback(record['address'])
+
     def _add_addresses(self):
         """ Create nodes for all addresses in batch_new_addresses
 
