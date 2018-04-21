@@ -19,7 +19,7 @@ class GraphDatabaseDriver:
         # Create an Index on Address:hash, fasten MERGE operations by a lot
         with self._driver.session() as session:
             with session.begin_transaction() as tx:
-                tx.run("CREATE INDEX ON :Address(hash)")
+                tx.run("CREATE INDEX ON :Address(address)")
 
         # New addresses and transactions stored in memory before batch adding
         self.batch_new_addresses = []
@@ -69,7 +69,7 @@ class GraphDatabaseDriver:
         :param callback: Function to execute with each address
         """
         query = "MATCH p=(a:Address) " \
-                "RETURN a.hash AS address "
+                "RETURN a.address AS address "
 
         with self._driver.session() as session:
             with session.begin_transaction() as tx:
@@ -81,7 +81,7 @@ class GraphDatabaseDriver:
         """ Create nodes for all addresses in batch_new_addresses
 
         """
-        query = "UNWIND $addresses AS h MERGE (a:Address{ hash: h })"
+        query = "UNWIND $addresses AS h MERGE (a:Address{ address: h })"
         with self._driver.session() as session:
             with session.begin_transaction() as tx:
                 tx.run(query, addresses=self.batch_new_addresses)
@@ -90,9 +90,10 @@ class GraphDatabaseDriver:
         """ Create edges for all addresses relations in batch_new_relations
         """
         query = "UNWIND $relations AS a " \
-                "MATCH (a1:Address { hash: a[0] }) " \
-                "MATCH (a2:Address { hash: a[1] }) " \
+                "MATCH (a1:Address { address: a[0] }) " \
+                "MATCH (a2:Address { address: a[1] }) " \
                 "MERGE (a1)-[:USER]->(a2)"
         with self._driver.session() as session:
+            
             with session.begin_transaction() as tx:
                 tx.run(query, relations=self.batch_new_relations)

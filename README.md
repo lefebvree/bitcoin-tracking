@@ -2,9 +2,21 @@
 
 ## About
 
+Algorithm allowing the re-identification of Bitcoin users from heuristics based on transaction history
+
 ## Usage
 
-1. Config files in `/app` in the following format :
+1. Install python dependencies from requirements file
+
+```shell
+pip3 install -r requirements.txt
+```
+
+2. Setup [Apache Spark](https://spark.apache.org/downloads.html), an instance will be launched by the PySpark executor
+
+3. Setup [Neo4j](https://neo4j.com/docs/operations-manual/current/installation/) and start it
+
+4. Create a config files in `/app` in the following format :
 
  - `databaseconfig.py` : PySpark and Neo4j databases configurations
  ```python
@@ -14,13 +26,13 @@ pyspark = {
     'memory': '2g' # Allocated memory for Spark
 }
 neo4j = {
-    'uri': 'bolt://localhost:7687',
+    'uri': 'bolt://localhost:7687', # Bolt instance URI
     'user': 'neo4j',
     'password': 'password'
 }
 ```
 
-2. Running `main.py` will populate the Neo4j Graph Database with the discovered user
+5. Running `main.py` will populate the Neo4j Graph Database with the discovered user
 network :
 
 ```shell
