@@ -16,10 +16,11 @@ class GraphDatabaseDriver:
     def __init__(self):
         self._driver = GraphDatabase.driver(cfg['uri'], auth=(cfg['user'], cfg['password']))
 
-        # Create an Index on Address:hash, fasten MERGE operations by a lot
+        # Create an Index on Address:address and User:id, fasten MERGE operations by a lot
         with self._driver.session() as session:
             with session.begin_transaction() as tx:
-                tx.run("CREATE INDEX ON :Address(address)")
+                tx.run("CREATE CONSTRAINT ON (address:Address) ASSERT address.address IS UNIQUE")
+                tx.run("CREATE CONSTRAINT ON (user:User) ASSERT user.id IS UNIQUE")
 
         # New addresses and transactions stored in memory before batch adding
         self.batch_new_addresses = []
@@ -88,12 +89,40 @@ class GraphDatabaseDriver:
 
     def _add_relations(self):
         """ Create edges for all addresses relations in batch_new_relations
+
         """
         query = "UNWIND $relations AS a " \
                 "MATCH (a1:Address { address: a[0] }) " \
                 "MATCH (a2:Address { address: a[1] }) " \
                 "MERGE (a1)-[:USER]->(a2)"
         with self._driver.session() as session:
-            
+
             with session.begin_transaction() as tx:
                 tx.run(query, relations=self.batch_new_relations)
+
+    def find_connected_components(self):
+        """ Search all connected Address components and assign an user attribute to identify their partition,
+        return the number of user partitions found
+
+        """
+        query = "CALL algo.unionFind('Address', 'USER', {write:true, partitionProperty:'user'}) " \
+                "YIELD setCount " \
+                "RETURN setCount"
+
+        with self._driver.session() as session:
+            with session.begin_transaction() as tx:
+                result = tx.run(query).single()
+                return int(result['setCount'])
+
+    def create_user_nodes(self):
+        """ Create new user nodes from connected components ids and add relation from addresses to user nodes
+
+        """
+        query = "MATCH (address:Address) " \
+                "MERGE (user:User { id: address.user }) " \
+                "WITH address, user " \
+                "CREATE (user)-[r:OWN]->(address)"
+
+        with self._driver.session() as session:
+            with session.begin_transaction() as tx:
+                tx.run(query)

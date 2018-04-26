@@ -13,7 +13,7 @@ class UserNetwork:
     def __init__(self):
         self.driver = GraphDatabaseDriver()
 
-        self.heuristics_enabled = [self.h1_inputs, self.h2_change_address, self.h3_one_time_change_address]
+        self.heuristics_enabled = [self.h1_inputs]
         # Keep track of each heuristic usage
         self.heuristics_used = [0, 0, 0, 0]
 
@@ -67,6 +67,15 @@ class UserNetwork:
         :param address: String of bitcoin address
         """
         return self.encode_address(address) in self.known_addresses
+
+    def generate_users_nodes(self):
+        print("Finding connected components from addresses...")
+        user_count = self.driver.find_connected_components()
+
+        print(user_count, "unique users found, creating User nodes...")
+        self.driver.create_user_nodes()
+
+        print("User nodes created\n")
 
     @staticmethod
     def encode_address(address):
