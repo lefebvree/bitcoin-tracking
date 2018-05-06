@@ -14,8 +14,10 @@ Algorithm allowing the re-identification of Bitcoin users from heuristics based 
 
 2. Setup [Apache Spark](https://spark.apache.org/downloads.html), an instance will be launched by the PySpark executor
 
-3. Setup [Neo4j](https://neo4j.com/docs/operations-manual/current/installation/) and the 
-[Neo4j Graph Algorithms plugin](https://github.com/neo4j-contrib/neo4j-graph-algorithms) and launch an instance of it
+3. Setup [Neo4j](https://neo4j.com/docs/operations-manual/current/installation/), the 
+[Neo4j Graph Algorithms plugin](https://github.com/neo4j-contrib/neo4j-graph-algorithms) and 
+[APOC Procedures plugin](https://github.com/neo4j-contrib/neo4j-apoc-procedures) and 
+launch an instance of it
 
 4. Create a config files in `/app` in the following format :
 
@@ -48,6 +50,8 @@ network :
 * Neo4j : https://neo4j.com/
 
 * Neo4j Graph Algorithms plugin : https://github.com/neo4j-contrib/neo4j-graph-algorithms
+
+* Neo4j APOC Procedures plugin : https://github.com/neo4j-contrib/neo4j-apoc-procedures
 
 
 ## References

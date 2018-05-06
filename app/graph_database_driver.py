@@ -118,11 +118,10 @@ class GraphDatabaseDriver:
         """ Create new user nodes from connected components ids and add relation from addresses to user nodes
 
         """
-        query = "MATCH (address:Address) " \
-                "MERGE (user:User { id: address.user }) " \
-                "WITH address, user " \
-                "CREATE (user)-[r:OWN]->(address)"
+        query = "CALL apoc.periodic.iterate( " \
+                " \"MATCH (address:Address) RETURN address\", " \
+                " \"MERGE (user:User { id: address.user }) CREATE (user)-[r:OWN]->(address) \", " \
+                "{batchSize:1000, iterateList:true, parallel:true})"
 
         with self._driver.session() as session:
-            with session.begin_transaction() as tx:
-                tx.run(query)
+            session.run(query)
