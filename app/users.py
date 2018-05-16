@@ -20,6 +20,9 @@ class UserNetwork:
         # Keep set of known addresses (input or output)
         self.known_addresses = set()
 
+        # Dictionary of all addresses after H1 with user id
+        self.known_users = dict()
+
     def close(self):
         self.driver.close()
 
@@ -37,8 +40,16 @@ class UserNetwork:
         else:
             print("No already known addresses in database")
 
+    def populate_known_addresses_with_users(self):
+        print("Fetching all addresses with users from database")
+        self.driver.fetch_all_known_addresses_with_users(self.add_known_address_with_user)
+        print(len(self.known_users), "uniques addresses with users added\n")
+
     def commit_new_entries(self):
         self.driver.commit_additions()
+
+    def commit_new_user_relations(self):
+        self.driver.commit_user_relations()
 
     def add_transaction(self, transaction):
         """ Process a bitcoin transaction and addresses and relations to the graph database
@@ -67,6 +78,27 @@ class UserNetwork:
         :param address: String of bitcoin address
         """
         return self.encode_address(address) in self.known_addresses
+
+    def add_known_address_with_user(self, address, user):
+        """ Add a key from given address to known_users returning user's is
+
+        :param address: String of bitcoin address
+        :param user: Id of owner
+        """
+        b58_address = self.encode_address(address)
+        self.known_users[b58_address] = int(user)
+
+    def get_user_id_from_address(self, address):
+        """ Return id o user associated with address
+
+        :param address: String of bitcoin address
+        :return: Id of user
+        """
+        b58_address = self.encode_address(address)
+        if b58_address in self.known_users:
+            return self.known_users[b58_address]
+        else:
+            return None
 
     def generate_users_nodes(self):
         print("Finding connected components from addresses...")
@@ -154,3 +186,38 @@ class UserNetwork:
 
                 self.heuristics_used[2] += 1
 
+    def h4_community_detection(self, transaction):
+        """ 1. A first level of aggregation is created by applying H1. Sets of addresses belonging
+               to a same user are used as nodes of the hint network
+            2. For each transaction in the dataset, considering users found by H1 instead of
+               individual addresses, an edge is added (if not already present) between the (necessarily
+               unique) sender and each recipient if:
+               • there are less than 10 users in the ouput of the transaction (recipients)
+               • all recipients are different from the sender, i.e there is no already known
+               change address
+
+            On this network, a community detection algorithm is applied. Communities correspond
+            to unique users
+        """
+        if len(transaction.outputs) < 10:
+            # Get the user id from known_users
+            sender_id = self.get_user_id_from_address(transaction.inputs[0].address)
+            if sender_id is None:
+                return
+
+            for output in transaction.outputs:
+                # A recipient is the same as the sender
+                recipient = self.get_user_id_from_address(output.address)
+                if recipient is None or recipient == sender_id:
+                    return
+
+            for output in transaction.outputs:
+                recipient_id = self.get_user_id_from_address(output.address)
+                value = int(output.value)
+                self.driver.add_user_relation(sender_id, recipient_id, value)
+
+    def community_detection(self):
+        """ Apply a community detection algorithm to uniques users nodes with transactions as edges
+
+        """
+        self.driver.run_louvain_algorithm()

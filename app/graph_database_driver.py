@@ -25,6 +25,7 @@ class GraphDatabaseDriver:
         # New addresses and transactions stored in memory before batch adding
         self.batch_new_addresses = []
         self.batch_new_relations = []
+        self.batch_new_user_relations = []
 
     def close(self):
         self._driver.close()
@@ -38,6 +39,10 @@ class GraphDatabaseDriver:
 
         self._add_relations()
         self.batch_new_relations.clear()
+
+    def commit_user_relations(self):
+        self._add_user_relations()
+        self.batch_new_user_relations.clear()
 
     def add_address(self, address):
         """ Add a new address for next commit
@@ -53,6 +58,9 @@ class GraphDatabaseDriver:
         """
         if edge[0] != edge[1]:
             self.batch_new_relations.append(edge)
+
+    def add_user_relation(self, user1_id, user2_id, value):
+        self.batch_new_user_relations.append([user1_id, user2_id, value])
 
     def get_address_count(self):
         """ Get number of Addresses nodes in graph
@@ -78,6 +86,20 @@ class GraphDatabaseDriver:
                     # Add addresses to set
                     callback(record['address'])
 
+    def fetch_all_known_addresses_with_users(self, callback):
+        """ Fetch all addresses from graph and execute callback function for everyone
+
+        :param callback: Function to execute with each address
+        """
+        query = "MATCH (u:User)-[:OWN]->(a:Address) " \
+                "RETURN a.address AS address, u.id AS user "
+
+        with self._driver.session() as session:
+            with session.begin_transaction() as tx:
+                for record in tx.run(query):
+                    # Add addresses to set
+                    callback(record['address'], record['user'])
+
     def _add_addresses(self):
         """ Create nodes for all addresses in batch_new_addresses
 
@@ -97,6 +119,18 @@ class GraphDatabaseDriver:
                 "MERGE (a1)-[:USER]->(a2)"
         with self._driver.session() as session:
 
+            with session.begin_transaction() as tx:
+                tx.run(query, relations=self.batch_new_relations)
+
+    def _add_user_relations(self):
+        """ Create edges for all Users relations in batch_new_users_relations
+
+        """
+        query = "UNWIND $relations AS r " \
+                "MATCH (u1:User { id: r[0] }) " \
+                "MATCH (u2:User { id: r[1] }) " \
+                "CREATE (u1)-[:TRANSACTION { value: r[2] }]->(u2)"
+        with self._driver.session() as session:
             with session.begin_transaction() as tx:
                 tx.run(query, relations=self.batch_new_relations)
 
@@ -121,7 +155,18 @@ class GraphDatabaseDriver:
         query = "CALL apoc.periodic.iterate( " \
                 " \"MATCH (address:Address) RETURN address\", " \
                 " \"MERGE (user:User { id: address.user }) CREATE (user)-[r:OWN]->(address) \", " \
-                "{batchSize:1000, iterateList:true, parallel:true})"
+                "{batchSize:5000, parallel:true, iterateList: true, retries: 1})"
+
+        with self._driver.session() as session:
+            session.run(query)
+
+    def run_louvain_algorithm(self):
+        """ Apply louvain community detection algorithm to uniques users nodes with transactions as edges
+
+        """
+        query = "CALL algo.louvain('User', 'TRANSACTION', " \
+                "{weightProperty:'value', write:true, writeProperty:'community'}) " \
+                "YIELD nodes, communityCount"
 
         with self._driver.session() as session:
             session.run(query)

@@ -26,7 +26,11 @@ def main():
     print("Initialising Neo4j session...")
     transactions_network = TransactionNetwork()
     transactions_network.build(transactions_dataframe)
+
     transactions_network.addresses.generate_users_nodes()
+
+    transactions_network.build_identity_hint_network(transactions_dataframe)
+    transactions_network.addresses.community_detection()
 
 
 if __name__ == '__main__':

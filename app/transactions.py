@@ -36,7 +36,7 @@ class TransactionNetwork:
         transactions_batch_count = 0
 
         print("Building graph from", transactions_total, "transactions...")
-        print("Transactions :     Addresses :    Heuristics usage :    Progression :")
+        print("Transactions :     Addresses :    Progression :")
 
         for t in transactions_iterator:
 
@@ -46,10 +46,9 @@ class TransactionNetwork:
             # Display transactions count and heuristics usage
             transactions_total_count += 1
             sys.stdout.write(
-                "\r{0: >12}    {1: >12}      {2}        ({3}%)".format(
+                "\r{0: >12}    {1: >12}      ({2}%)".format(
                     transactions_total_count,
                     len(self.addresses.known_addresses),
-                    self.addresses.heuristics_used,
                     round(transactions_total_count/transactions_total*100, 2)
                 ))
             sys.stdout.flush()
@@ -61,7 +60,38 @@ class TransactionNetwork:
                 transactions_batch_count = 0
 
         print("\nDone")
-        self.addresses.close()
+
+    def build_identity_hint_network(self, spark_df):
+
+        print("Building Identity hint network...")
+        self.addresses.populate_known_addresses_with_users()
+
+        transactions_iterator = spark_df.toLocalIterator()
+        transactions_total = spark_df.count()
+
+        transactions_total_count = 0
+        # Transactions are committed every 10000
+        transactions_batch_limit = 10000
+        transactions_batch_count = 0
+
+        print("Adding edges between users for", transactions_total, "transactions...")
+        print("Transactions :    Progression :")
+        for t in transactions_iterator:
+            transactions_total_count += 1
+            self.addresses.h4_community_detection(TransactionNetwork.json_to_transaction(t))
+
+            sys.stdout.write(
+                "\r{0: >12}      ({1}%)".format(
+                    transactions_total_count,
+                    round(transactions_total_count / transactions_total * 100, 2)
+                ))
+            sys.stdout.flush()
+
+            # Commit new transactions every transactions_batch_limit
+            transactions_batch_count += 1
+            if transactions_batch_count == transactions_batch_limit:
+                self.addresses.commit_new_user_relations()
+                transactions_batch_count = 0
 
     @staticmethod
     def json_to_transaction(transaction_json):
